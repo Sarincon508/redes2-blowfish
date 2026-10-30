@@ -1,73 +1,82 @@
 """
-Servidor Web Flask con Cifrado Blowfish
+Servidor Web Flask con Cifrado Blowfish Extremo a Extremo
 Materia: Redes II - Proyecto Integrador
-Despliegue Web 100% en la Nube (Render.com, Railway, etc.)
-Permite salas privadas para mensajearse con personas especificas desde cualquier navegador o movil.
+
+El servidor almacena y transporta UNICAMENTE datos cifrados (IV + Ciphertext).
+Tanto el remitente como el mensaje se cifran juntos.
+Si un usuario entra con una clave diferente (incluso por 1 solo caracter),
+el algoritmo Blowfish CBC fallara y no podra leer ni el remitente ni el mensaje.
 """
 
 import os
-import time
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from cifrado_blowfish import cifrar_mensaje, descifrar_mensaje, CLAVE_COMPARTIDA
 
 app = Flask(__name__)
 
-# Estructura en memoria para salas privadas:
-# salas = { "nombre_sala": [ {id, remitente, texto, cipher_hex, iv_hex, hora} ] }
+# Estructura en memoria:
+# salas_mensajes = { "sala": [ {id, cipher_hex, iv_hex, bytes_count, timestamp} ] }
 salas_mensajes = {}
 contador_ids = 0
 
 def ajustar_clave(clave_str: str) -> bytes:
-    """Ajusta una clave dada por el usuario a un tamano valido para Blowfish (16 bytes = 128 bits)."""
+    """
+    Convierte la clave a bytes para Blowfish.
+    Blowfish acepta claves variables de 32 a 448 bits (4 a 56 bytes).
+    Si se cambia o eliminan caracteres, la clave resultante es completamente distinta.
+    """
     if not clave_str:
         return CLAVE_COMPARTIDA
     clave_bytes = clave_str.encode('utf-8')
     if len(clave_bytes) < 4:
-        clave_bytes = clave_bytes.ljust(16, b'#')
-    elif len(clave_bytes) > 56:  # Limite maximo de Blowfish es 448 bits = 56 bytes
+        clave_bytes = clave_bytes.ljust(4, b'#')
+    elif len(clave_bytes) > 56:
         clave_bytes = clave_bytes[:56]
     return clave_bytes
 
 @app.route("/")
 def index():
-    """Sirve la aplicacion web de mensajeria."""
+    """Sirve la aplicacion web."""
     return render_template("index.html")
 
 @app.route("/api/send", methods=["POST"])
 def enviar_mensaje():
-    """Recibe un mensaje de la web, lo cifra con Blowfish y lo almacena en la sala correspondiente."""
+    """
+    Recibe el remitente y el texto, los concatena y los cifra juntos con Blowfish.
+    El servidor NO almacena texto plano; unicamente almacena el paquete cifrado.
+    """
     global contador_ids
     datos = request.get_json(force=True)
     
     sala = datos.get("room", "").strip().lower() or "general"
     remitente = datos.get("sender", "").strip() or "Anonimo"
     texto = datos.get("text", "").strip()
-    clave_personalizada = datos.get("key", "").strip()
+    clave_str = datos.get("key", "").strip()
     
     if not texto:
         return jsonify({"success": False, "error": "El mensaje no puede estar vacio"}), 400
 
-    clave = ajustar_clave(clave_personalizada)
+    clave = ajustar_clave(clave_str)
     
     try:
+        # Formato del payload seguro: "Remitente::: Mensaje"
+        payload_plano = f"{remitente}::: {texto}"
+        
         # Cifrado Blowfish CBC (64 bits, IV aleatorio)
-        paquete_cifrado = cifrar_mensaje(texto, clave=clave)
+        paquete_cifrado = cifrar_mensaje(payload_plano, clave=clave)
         iv_hex = paquete_cifrado[:8].hex()
-        cuerpo_cifrado_hex = paquete_cifrado[8:].hex()
-        paquete_completo_hex = paquete_cifrado.hex()
+        paquete_hex = paquete_cifrado.hex()
         
         contador_ids += 1
         hora_actual = datetime.now().strftime("%H:%M:%S")
         
-        mensaje_obj = {
+        # El servidor almacena UNICAMENTE datos cifrados
+        registro_cifrado = {
             "id": contador_ids,
             "room": sala,
-            "sender": remitente,
-            "text": texto,  # Texto descifrado para mostrar al usuario autorizado
-            "cipher_hex": paquete_completo_hex,
+            "cipher_hex": paquete_hex,
             "iv_hex": iv_hex,
-            "body_hex": cuerpo_cifrado_hex,
             "bytes_count": len(paquete_cifrado),
             "timestamp": hora_actual
         }
@@ -75,29 +84,82 @@ def enviar_mensaje():
         if sala not in salas_mensajes:
             salas_mensajes[sala] = []
             
-        salas_mensajes[sala].append(mensaje_obj)
-        # Mantener maximo ultimos 100 mensajes por sala
+        salas_mensajes[sala].append(registro_cifrado)
         if len(salas_mensajes[sala]) > 100:
             salas_mensajes[sala].pop(0)
             
-        return jsonify({"success": True, "message": mensaje_obj})
+        return jsonify({
+            "success": True,
+            "message": {
+                "id": contador_ids,
+                "sender": remitente,
+                "text": texto,
+                "cipher_hex": paquete_hex,
+                "iv_hex": iv_hex,
+                "bytes_count": len(paquete_cifrado),
+                "timestamp": hora_actual,
+                "decrypted": True
+            }
+        })
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/messages", methods=["GET"])
 def obtener_mensajes():
-    """Obtiene los mensajes de una sala especifica con ID mayor a 'since'."""
+    """
+    Obtiene los paquetes cifrados de la sala e intenta descifrarlos
+    usando la clave que el usuario lector proporciona.
+    Si la clave no coincide, el descifrado falla y se oculta el contenido y el remitente.
+    """
     sala = request.args.get("room", "").strip().lower() or "general"
+    clave_str = request.args.get("key", "").strip()
     since_id = int(request.args.get("since", 0))
     
+    clave_lector = ajustar_clave(clave_str)
     mensajes_sala = salas_mensajes.get(sala, [])
     nuevos = [m for m in mensajes_sala if m["id"] > since_id]
     
+    procesados = []
+    for m in nuevos:
+        paquete_bytes = bytes.fromhex(m["cipher_hex"])
+        try:
+            # Intento de descifrado con Blowfish CBC usando la clave del lector
+            texto_descifrado = descifrar_mensaje(paquete_bytes, clave=clave_lector)
+            
+            # Formato esperado: "Remitente::: Texto"
+            if "::: " in texto_descifrado:
+                remitente, cuerpo = texto_descifrado.split("::: ", 1)
+            else:
+                remitente, cuerpo = "Desconocido", texto_descifrado
+                
+            procesados.append({
+                "id": m["id"],
+                "sender": remitente,
+                "text": cuerpo,
+                "cipher_hex": m["cipher_hex"],
+                "iv_hex": m["iv_hex"],
+                "bytes_count": m["bytes_count"],
+                "timestamp": m["timestamp"],
+                "decrypted": True
+            })
+        except Exception:
+            # Falla criptografica: la clave del lector no es igual a la del emisor
+            procesados.append({
+                "id": m["id"],
+                "sender": "🔒 Cifrado con Blowfish",
+                "text": "⚠️ [ERROR DE DESCIFRADO]: No se pudo descifrar este mensaje. Tu clave Blowfish es diferente a la del emisor.",
+                "cipher_hex": m["cipher_hex"],
+                "iv_hex": m["iv_hex"],
+                "bytes_count": m["bytes_count"],
+                "timestamp": m["timestamp"],
+                "decrypted": False
+            })
+            
     return jsonify({
         "success": True,
         "room": sala,
-        "messages": nuevos,
+        "messages": procesados,
         "total": len(mensajes_sala)
     })
 
@@ -110,7 +172,6 @@ def limpiar_sala():
     return jsonify({"success": True, "message": f"Sala {sala} vaciada"})
 
 if __name__ == "__main__":
-    # Puerto dinamico para despliegues en la nube (Render, Railway, etc.)
     puerto = int(os.environ.get("PORT", 5000))
     print(f"[*] Servidor Web Redes II activo en el puerto {puerto}")
     app.run(host="0.0.0.0", port=puerto, debug=False)

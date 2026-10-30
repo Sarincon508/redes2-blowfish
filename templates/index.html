@@ -15,6 +15,7 @@
             --text-muted: #94a3b8;
             --msg-me: #0369a1;
             --msg-other: #334155;
+            --msg-error: #450a0a;
             --crypto-bg: #090d16;
             --crypto-border: #f43f5e;
             --success: #10b981;
@@ -83,7 +84,6 @@
             100% { opacity: 0.4; }
         }
 
-        /* Modal inicial de login / sala */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -104,7 +104,7 @@
             border-radius: 12px;
             padding: 24px;
             width: 100%;
-            max-width: 440px;
+            max-width: 450px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
         }
 
@@ -168,7 +168,6 @@
             background: var(--accent-hover);
         }
 
-        /* Contenedor Principal */
         .chat-container {
             display: flex;
             flex: 1;
@@ -179,7 +178,6 @@
             overflow: hidden;
         }
 
-        /* Panel Izquierdo: Chat */
         .main-chat {
             flex: 1;
             display: flex;
@@ -195,7 +193,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .messages-area {
@@ -208,7 +208,7 @@
         }
 
         .msg-bubble {
-            max-width: 80%;
+            max-width: 82%;
             padding: 10px 14px;
             border-radius: 12px;
             font-size: 0.95rem;
@@ -226,6 +226,13 @@
         .msg-theirs {
             align-self: flex-start;
             background: var(--msg-other);
+            border-bottom-left-radius: 2px;
+        }
+
+        .msg-failed {
+            align-self: flex-start;
+            background: var(--msg-error);
+            border: 1px solid #ef4444;
             border-bottom-left-radius: 2px;
         }
 
@@ -253,7 +260,6 @@
             cursor: pointer;
         }
 
-        /* Input Area */
         .input-bar {
             background: var(--bg-card);
             padding: 12px 18px;
@@ -284,11 +290,6 @@
             transition: transform 0.1s;
         }
 
-        .input-bar button:active {
-            transform: scale(0.96);
-        }
-
-        /* Panel Derecho: Monitor Criptografico de Redes II */
         .crypto-sidebar {
             width: 380px;
             background: var(--crypto-bg);
@@ -360,11 +361,11 @@
         </div>
     </header>
 
-    <!-- Modal inicial para seleccionar sala privada y nombre -->
+    <!-- Modal inicial para seleccionar sala privada y clave -->
     <div class="modal-overlay" id="modal-sala">
         <div class="modal-card">
-            <h2>💬 Iniciar Chat Seguro</h2>
-            <p>Ingresa tu nombre y el <b>nombre de la sala privada</b> para comunicarte con la otra persona en tiempo real.</p>
+            <h2>💬 Configuración del Chat</h2>
+            <p>Para comunicarse con la otra persona, ambos deben ingresar la <b>misma Sala</b> y la <b>misma Clave Secreta</b>.</p>
             
             <div class="form-group">
                 <label>Tu Nombre / Alias:</label>
@@ -374,12 +375,12 @@
             <div class="form-group">
                 <label>Sala Privada / Código Compartido:</label>
                 <input type="text" id="input-sala" placeholder="Ej. proyecto-redes2" value="proyecto-redes2">
-                <small style="color: #94a3b8; font-size: 0.75rem;">Ambos deben poner el mismo nombre de sala para verse.</small>
             </div>
 
             <div class="form-group">
-                <label>Clave Blowfish (128 bits):</label>
+                <label>Clave Blowfish Compartida:</label>
                 <input type="text" id="input-clave" placeholder="Por defecto: Redes2Clave128B!" value="Redes2Clave128B!">
+                <small style="color: #fca5a5; font-size: 0.75rem;">¡Si la clave no coincide exactamente, Blowfish no podrá descifrar los mensajes!</small>
             </div>
 
             <button class="btn-primary" onclick="unirseAlChat()">Entrar al Chat Seguro</button>
@@ -391,16 +392,17 @@
         <main class="main-chat">
             <div class="chat-info-bar">
                 <div>
-                    <b>Sala Privada:</b> <span id="txt-sala-nombre" style="color: var(--accent);">---</span> | 
-                    <b>Usuario:</b> <span id="txt-mi-usuario">---</span>
+                    <b>Sala:</b> <span id="txt-sala-nombre" style="color: var(--accent);">---</span> | 
+                    <b>Usuario:</b> <span id="txt-mi-usuario">---</span> |
+                    <b>Clave Activa:</b> <code id="txt-mi-clave" style="color: #34d399; font-size: 0.78rem;">---</code>
                 </div>
                 <div>
-                    <button onclick="cambiarSala()" style="background: none; border: 1px solid #475569; color: #94a3b8; border-radius: 4px; padding: 3px 8px; font-size: 0.75rem; cursor: pointer;">Cambiar Sala</button>
+                    <button onclick="cambiarSala()" style="background: none; border: 1px solid #475569; color: #94a3b8; border-radius: 4px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer;">Cambiar Sala / Clave</button>
                 </div>
             </div>
 
             <div class="messages-area" id="box-mensajes">
-                <!-- Los mensajes se insertan aqui dinamicamente -->
+                <!-- Mensajes dinamicos -->
             </div>
 
             <div class="input-bar">
@@ -413,13 +415,13 @@
         <aside class="crypto-sidebar">
             <h3>🛡️ Monitor Criptográfico Blowfish</h3>
             <p style="font-size: 0.75rem; color: #94a3b8; line-height: 1.3;">
-                Demostración para Redes II: Visualización en tiempo real del paquete cifrado que viaja por la capa de aplicación/transporte.
+                Demostración para Redes II: Visualización del paquete cifrado que viaja por la red (IV + Ciphertext).
             </p>
 
             <div class="crypto-card">
-                <span class="crypto-label">MODO DE OPERACIÓN:</span>
+                <span class="crypto-label">ALGORITMO Y MODO:</span>
                 <div>Blowfish CBC (Cipher Block Chaining)</div>
-                <div style="color: #94a3b8; font-size: 0.7rem; margin-top: 2px;">Bloque: 64 bits | Clave: 128 bits</div>
+                <div style="color: #94a3b8; font-size: 0.7rem; margin-top: 2px;">Bloque: 64 bits | Clave Simétrica</div>
             </div>
 
             <div class="crypto-card">
@@ -437,9 +439,8 @@
             </div>
 
             <div class="crypto-card">
-                <span class="crypto-label">INTEGRIDAD DEL CANAL:</span>
-                <div style="color: #34d399;">✔ Relleno PKCS#7 verificado</div>
-                <div style="color: #34d399;">✔ Confidencialidad activa</div>
+                <span class="crypto-label">ESTADO DE DESCIFRADO:</span>
+                <div id="mon-status" style="color: #34d399;">✔ Clave verificada</div>
             </div>
         </aside>
     </div>
@@ -467,15 +468,16 @@
 
             document.getElementById("txt-mi-usuario").innerText = miUsuario;
             document.getElementById("txt-sala-nombre").innerText = "#" + miSala;
+            document.getElementById("txt-mi-clave").innerText = miClave;
             document.getElementById("modal-sala").style.display = "none";
 
-            // Limpiar e iniciar polling
+            // Limpiar historial previo para recargar con la clave actual
             document.getElementById("box-mensajes").innerHTML = "";
             ultimoId = 0;
             
             cargarMensajes();
             if (intervaloPolling) clearInterval(intervaloPolling);
-            intervaloPolling = setInterval(cargarMensajes, 1500); // Consulta cada 1.5s
+            intervaloPolling = setInterval(cargarMensajes, 1500);
         }
 
         function cambiarSala() {
@@ -505,7 +507,7 @@
                 const data = await res.json();
                 if (data.success) {
                     actualizarMonitor(data.message);
-                    cargarMensajes(); // Actualizar de inmediato
+                    cargarMensajes();
                 } else {
                     alert("Error al enviar: " + data.error);
                 }
@@ -516,7 +518,7 @@
 
         async function cargarMensajes() {
             try {
-                const res = await fetch(`/api/messages?room=${encodeURIComponent(miSala)}&since=${ultimoId}`);
+                const res = await fetch(`/api/messages?room=${encodeURIComponent(miSala)}&key=${encodeURIComponent(miClave)}&since=${ultimoId}`);
                 const data = await res.json();
                 
                 if (data.success && data.messages.length > 0) {
@@ -527,18 +529,34 @@
                         
                         const esMio = msg.sender.toLowerCase() === miUsuario.toLowerCase();
                         const bubble = document.createElement("div");
-                        bubble.className = `msg-bubble ${esMio ? 'msg-mine' : 'msg-theirs'}`;
                         
-                        bubble.innerHTML = `
-                            <div class="msg-header">
-                                <span>${escapeHtml(msg.sender)}</span>
-                                <span>${msg.timestamp}</span>
-                            </div>
-                            <div class="msg-text">${escapeHtml(msg.text)}</div>
-                            <div class="msg-crypto-tag" onclick="actualizarMonitorDesdeMsg('${msg.iv_hex}', '${msg.cipher_hex}', ${msg.bytes_count})">
-                                🔒 Blowfish: ${msg.cipher_hex.substring(0, 16)}... (${msg.bytes_count} bytes)
-                            </div>
-                        `;
+                        if (!msg.decrypted) {
+                            bubble.className = "msg-bubble msg-failed";
+                            bubble.innerHTML = `
+                                <div class="msg-header" style="color: #fca5a5;">
+                                    <span>⚠️ ${escapeHtml(msg.sender)}</span>
+                                    <span>${msg.timestamp}</span>
+                                </div>
+                                <div class="msg-text" style="color: #fecaca; font-style: italic;">
+                                    ${escapeHtml(msg.text)}
+                                </div>
+                                <div class="msg-crypto-tag" onclick="actualizarMonitorDesdeMsg('${msg.iv_hex}', '${msg.cipher_hex}', ${msg.bytes_count}, false)">
+                                    🔒 Cifrado: ${msg.cipher_hex.substring(0, 20)}... (Clave no coincide)
+                                </div>
+                            `;
+                        } else {
+                            bubble.className = `msg-bubble ${esMio ? 'msg-mine' : 'msg-theirs'}`;
+                            bubble.innerHTML = `
+                                <div class="msg-header">
+                                    <span>${escapeHtml(msg.sender)}</span>
+                                    <span>${msg.timestamp}</span>
+                                </div>
+                                <div class="msg-text">${escapeHtml(msg.text)}</div>
+                                <div class="msg-crypto-tag" onclick="actualizarMonitorDesdeMsg('${msg.iv_hex}', '${msg.cipher_hex}', ${msg.bytes_count}, true)">
+                                    🔒 Blowfish: ${msg.cipher_hex.substring(0, 16)}... (${msg.bytes_count} bytes)
+                                </div>
+                            `;
+                        }
                         
                         box.appendChild(bubble);
                         actualizarMonitor(msg);
@@ -555,12 +573,29 @@
             document.getElementById("mon-iv").innerText = msg.iv_hex || "---";
             document.getElementById("mon-cipher").innerText = msg.cipher_hex || "---";
             document.getElementById("mon-bytes").innerText = msg.bytes_count || "0";
+            
+            const st = document.getElementById("mon-status");
+            if (msg.decrypted === false) {
+                st.innerText = "❌ Fallo de descifrado (Clave no coincide)";
+                st.style.color = "#f43f5e";
+            } else {
+                st.innerText = "✔ Clave coincidente (Texto descifrado)";
+                st.style.color = "#34d399";
+            }
         }
 
-        function actualizarMonitorDesdeMsg(iv, cipher, bytes) {
+        function actualizarMonitorDesdeMsg(iv, cipher, bytes, dec) {
             document.getElementById("mon-iv").innerText = iv;
             document.getElementById("mon-cipher").innerText = cipher;
             document.getElementById("mon-bytes").innerText = bytes;
+            const st = document.getElementById("mon-status");
+            if (!dec) {
+                st.innerText = "❌ Fallo de descifrado (Clave no coincide)";
+                st.style.color = "#f43f5e";
+            } else {
+                st.innerText = "✔ Clave coincidente (Texto descifrado)";
+                st.style.color = "#34d399";
+            }
         }
 
         function escapeHtml(text) {
@@ -569,7 +604,6 @@
             return div.innerHTML;
         }
 
-        // Enviar con tecla Enter
         document.getElementById("input-texto").addEventListener("keydown", function(e) {
             if (e.key === "Enter") {
                 enviarMensaje();
