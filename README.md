@@ -1,7 +1,15 @@
 # Aplicación de Mensajería Segura con Cifrado Blowfish
 **Materia:** Redes II  
 **Proyecto:** Proyecto Integrador - Seguridad en la Capa de Transporte y Aplicación  
-**Ubicación:** `F:\Users\Max\Desktop\redes`
+**Repositorio:** `https://github.com/Sarincon508/redes2-blowfish.git`
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Sarincon508/redes2-blowfish)
+
+---
+
+## 🚀 Despliegue en 1 Clic en Render:
+Haz clic en el siguiente enlace directo:
+👉 **[Desplegar en Render (1 Clic)](https://render.com/deploy?repo=https://github.com/Sarincon508/redes2-blowfish)**
 
 ---
 
