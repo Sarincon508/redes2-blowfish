@@ -16,6 +16,18 @@ from cifrado_blowfish import cifrar_mensaje, descifrar_mensaje, CLAVE_COMPARTIDA
 
 app = Flask(__name__)
 
+def log_seguridad(texto: str):
+    """
+    Escribe inmediatamente a stderr y stdout con flush forzado.
+    Gunicorn en Render canaliza stderr directamente a la consola del panel web.
+    """
+    print(texto, file=sys.stderr, flush=True)
+    print(texto, file=sys.stdout, flush=True)
+    try:
+        app.logger.info(texto)
+    except Exception:
+        pass
+
 # Estructura en memoria:
 # salas_mensajes = { "sala": [ {id, cipher_hex, iv_hex, bytes_count, timestamp} ] }
 salas_mensajes = {}
@@ -85,15 +97,14 @@ def enviar_mensaje():
         # =====================================================================
         # LOGS EN VIVO PARA DEMOSTRACIÓN DE REDES II (RENDER / GUNICORN)
         # =====================================================================
-        print("\n" + "="*70, flush=True)
-        print(f"🔒 [MENSAJE RECIBIDO Y CIFRADO EN SERVIDOR] Hora: {hora_actual} | Sala: #{sala}", flush=True)
-        print(f"📦 Tamaño del Payload en Red: {len(paquete_cifrado)} bytes", flush=True)
-        print(f"🔑 Vector de Inicialización (IV 64-bit): {iv_hex}", flush=True)
-        print(f"🛡️  PAYLOAD CIFRADO BLOWFISH (HEX):", flush=True)
-        print(f"    {paquete_hex}", flush=True)
-        print(f"⚠️  SEGURIDAD EN LA NUBE: El servidor NO almacena texto plano.", flush=True)
-        print("="*70 + "\n", flush=True)
-        sys.stdout.flush()
+        log_seguridad("\n" + "="*70)
+        log_seguridad(f"🔒 [MENSAJE RECIBIDO Y CIFRADO EN SERVIDOR] Hora: {hora_actual} | Sala: #{sala}")
+        log_seguridad(f"📦 Tamaño del Payload en Red: {len(paquete_cifrado)} bytes")
+        log_seguridad(f"🔑 Vector de Inicialización (IV 64-bit): {iv_hex}")
+        log_seguridad(f"🛡️  PAYLOAD CIFRADO BLOWFISH (HEX):")
+        log_seguridad(f"    {paquete_hex}")
+        log_seguridad(f"⚠️  SEGURIDAD EN LA NUBE: El servidor NO almacena texto plano.")
+        log_seguridad("="*70 + "\n")
         
         if sala not in salas_mensajes:
             salas_mensajes[sala] = []
@@ -147,8 +158,7 @@ def obtener_mensajes():
             else:
                 remitente, cuerpo = "Desconocido", texto_descifrado
                 
-            print(f"🔓 [DESCIFRADO EXITOSO] Sala: #{sala} | ID: {m['id']} | Remitente: {remitente} | Clave correcta", flush=True)
-            sys.stdout.flush()
+            log_seguridad(f"🔓 [DESCIFRADO EXITOSO] Sala: #{sala} | ID: {m['id']} | Remitente: {remitente} | Clave correcta")
             procesados.append({
                 "id": m["id"],
                 "sender": remitente,
@@ -161,8 +171,7 @@ def obtener_mensajes():
             })
         except Exception:
             # Falla criptografica: la clave del lector no es igual a la del emisor
-            print(f"❌ [FALLO CRIPTOGRÁFICO DE DESCIFRADO] Sala: #{sala} | ID: {m['id']} | Clave no coincide. Payload HEX protegido: {m['cipher_hex'][:32]}...", flush=True)
-            sys.stdout.flush()
+            log_seguridad(f"❌ [FALLO CRIPTOGRÁFICO DE DESCIFRADO] Sala: #{sala} | ID: {m['id']} | Clave no coincide. Payload HEX protegido: {m['cipher_hex'][:32]}...")
             procesados.append({
                 "id": m["id"],
                 "sender": "🔒 Cifrado con Blowfish",
