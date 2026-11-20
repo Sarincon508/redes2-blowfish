@@ -9,6 +9,7 @@ el algoritmo Blowfish CBC fallara y no podra leer ni el remitente ni el mensaje.
 """
 
 import os
+import sys
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from cifrado_blowfish import cifrar_mensaje, descifrar_mensaje, CLAVE_COMPARTIDA
@@ -80,6 +81,19 @@ def enviar_mensaje():
             "bytes_count": len(paquete_cifrado),
             "timestamp": hora_actual
         }
+
+        # =====================================================================
+        # LOGS EN VIVO PARA DEMOSTRACIÓN DE REDES II (RENDER / GUNICORN)
+        # =====================================================================
+        print("\n" + "="*70, flush=True)
+        print(f"🔒 [MENSAJE RECIBIDO Y CIFRADO EN SERVIDOR] Hora: {hora_actual} | Sala: #{sala}", flush=True)
+        print(f"📦 Tamaño del Payload en Red: {len(paquete_cifrado)} bytes", flush=True)
+        print(f"🔑 Vector de Inicialización (IV 64-bit): {iv_hex}", flush=True)
+        print(f"🛡️  PAYLOAD CIFRADO BLOWFISH (HEX):", flush=True)
+        print(f"    {paquete_hex}", flush=True)
+        print(f"⚠️  SEGURIDAD EN LA NUBE: El servidor NO almacena texto plano.", flush=True)
+        print("="*70 + "\n", flush=True)
+        sys.stdout.flush()
         
         if sala not in salas_mensajes:
             salas_mensajes[sala] = []
@@ -133,6 +147,8 @@ def obtener_mensajes():
             else:
                 remitente, cuerpo = "Desconocido", texto_descifrado
                 
+            print(f"🔓 [DESCIFRADO EXITOSO] Sala: #{sala} | ID: {m['id']} | Remitente: {remitente} | Clave correcta", flush=True)
+            sys.stdout.flush()
             procesados.append({
                 "id": m["id"],
                 "sender": remitente,
@@ -145,6 +161,8 @@ def obtener_mensajes():
             })
         except Exception:
             # Falla criptografica: la clave del lector no es igual a la del emisor
+            print(f"❌ [FALLO CRIPTOGRÁFICO DE DESCIFRADO] Sala: #{sala} | ID: {m['id']} | Clave no coincide. Payload HEX protegido: {m['cipher_hex'][:32]}...", flush=True)
+            sys.stdout.flush()
             procesados.append({
                 "id": m["id"],
                 "sender": "🔒 Cifrado con Blowfish",
